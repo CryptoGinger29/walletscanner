@@ -52,7 +52,7 @@ class walletscanner:
             
             r=requests.get(self.baseurl + requrl + apikey)
             
-            s
+            
             print("\n")
             print("Status")
             for i in r.json()["data"]["items"]:
