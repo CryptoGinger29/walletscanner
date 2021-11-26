@@ -10,6 +10,7 @@ This is a temporary script file.
 import yaml
 import os
 import requests
+import pandas as pd 
 
 class walletscanner:
     def __init__(self):
@@ -24,7 +25,11 @@ class walletscanner:
         self.format="JSON"
         self.balanceendpoint="v1/{}/address/{}/balances_v2/?quote-currency={}&format={}&nft=true&no-nft-fetch=false"
         
+    
+    def setconfig(self,file):
+        self.config= yaml.load(file, Loader=yaml.FullLoader)
         
+        return self.config
         
     def readconfig(self,path=None):
         if path is None:
@@ -40,6 +45,9 @@ class walletscanner:
         
         
     def scancomplete(self):
+        
+        walletoverview=[]
+        
         self.total=0
         for i in self.config["wallets"]["wallets"]:
             
@@ -65,11 +73,15 @@ class walletscanner:
                 decimal_balance=i["balance"]                
                 balance=int(decimal_balance)/(10**decimal)
                 
+                walletoverview.append([attr["addr"],attr["network"],token,balance,quote])
+                
                 print("{}: {} ({} {})".format(token,balance,quote,self.currency))
             
             print("\n")
         
         print("total: {} {}".format(self.total,self.currency))
+        
+        return pd.DataFrame(walletoverview,columns=["wallet","network","token","balance","quote"])
         
 if __name__=="__main__":
     ws=walletscanner()
