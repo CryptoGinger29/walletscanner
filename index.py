@@ -1,11 +1,12 @@
 import dash
 import dash_bootstrap_components as dbc
 from dash import Input, Output, dcc, html, State
-from pages import menu,home
+from pages import menu,home,howto
 from dash_table import DataTable, FormatTemplate
 
 from src.main import walletscanner
 import base64
+import json 
 
 ws=walletscanner()
 
@@ -75,7 +76,8 @@ money = FormatTemplate.money(2)
 percentage = FormatTemplate.percentage(2)
 
 content = html.Div(id="page-content", style=CONTENT_STYLE)
-app.layout = html.Div([dcc.Location(id="url"), menu.sidebar, content])
+app.layout = html.Div([dcc.Location(id="url"), menu.sidebar, content,dcc.Store(id="walletoverview",storage_type="session")
+])
 
 
 
@@ -85,7 +87,7 @@ def render_page_content(pathname):
     if pathname == "/":
         return home.layout
     elif pathname == "/howto":
-        return html.P("This is the content of page 1. Yay!")
+        return howto.layout
     elif pathname == "/about":
         return html.P("This is the content of page 1. Yay!")
     # If the user tries to reach a different page, return a 404 message
@@ -103,14 +105,17 @@ def colsetup(columns):
     cols=[]
     percentagecols=["delta balance","delta quote"]
     moneycols=["quote","quote 24h"]
+    dropdowncols=["chainid"]
     for i in columns:
         if i in percentagecols:
             cols.append({"id":i,"name":i,"type":'numeric', "format":percentage})
         elif i in moneycols:
             cols.append({"id":i,"name":i,"type":'numeric', "format":money})
+        elif i in dropdowncols:
+            cols.append({"id":i,"name":i,"type":'text','presentation':'dropdown'})
         else:
             cols.append({"id":i,"name":i,"type":"text"})
-
+            
     return cols
 
 def parse_contents(contents, filename, date):
@@ -118,8 +123,8 @@ def parse_contents(contents, filename, date):
 
     decoded = base64.b64decode(content_string)
     try:
-        if 'yaml' in filename:
-            ws.setconfig(decoded.decode('utf-8'))
+        if 'json' in filename:
+            ws.setwallets(decoded)
             # Assume that the user uploaded a CSV file
             overview=ws.scancomplete()
             
@@ -140,7 +145,7 @@ def parse_contents(contents, filename, date):
                         style_data_conditional=TABLE_CONDITIONALFORMAT
                     )
             
-            df_grouped=overview.groupby(["network","token"]).sum().reset_index()
+            df_grouped=overview.groupby(["token"]).sum().reset_index()
             
             
             cols=colsetup(df_grouped.columns)
@@ -170,12 +175,123 @@ def parse_contents(contents, filename, date):
         ])
 
 @app.callback(Output('output-image-upload', 'children'),
+              Output('walletoverview','data'),
               Input('upload-image', 'contents'),
+              Input("updater","n_intervals"),
               State('upload-image', 'filename'),
-              State('upload-image', 'last_modified'))
-def update_output(list_of_contents, list_of_names, list_of_dates):
+              State('upload-image', 'last_modified'),
+              State('walletoverview', 'data'),)
+def update_output(list_of_contents,intervals, list_of_names, list_of_dates,data):
+    if data is not None:
+        if all(v is not None for v in data) and list_of_contents is None:
+            children = [
+                parse_contents(c, n, d) for c, n, d in
+                zip(data[0], data[1], data[2])]
+            return children,data         
+        
     if list_of_contents is not None:
         children = [
             parse_contents(c, n, d) for c, n, d in
             zip(list_of_contents, list_of_names, list_of_dates)]
-        return children 
+        return children,[list_of_contents, list_of_names, list_of_dates] 
+    
+    return html.Div(),html.Div()
+    
+@app.callback(
+    Output('table-editing-wallets', 'data'),
+    Input('editing-rows-button', 'n_clicks'),
+    State('table-editing-wallets', 'data'),
+    State('table-editing-wallets', 'columns'))
+def add_row(n_clicks, rows, columns):
+    if n_clicks > 0:
+        rows.append({c['id']: '' for c in columns})
+    return rows
+
+@app.callback(
+    Output("download-table", "children"),
+    Input("download-button", "n_clicks"),
+    State('table-editing-wallets',"data"),
+    prevent_initial_call=True,
+)
+def func(n_clicks,data):
+    content={"wallets":data}
+    
+    data_string = json.dumps(content)
+    
+    return html.A(
+        "Download Data",
+        id="download-link",
+        download="download.json",
+        href=f"data:text/json;charset=utf-8,{data_string}",
+        target="_blank",
+        )  
+
+@app.callback(
+    Output("cont_tbl_chains", "children"),
+    Input("cont_tbl_chains", "children"),
+    prevent_initial_call=False,
+)
+def chainreader(trigger):
+    
+    json_chains=ws.getchains()
+    
+    cols=colsetup(json_chains[0].keys())
+
+    
+    return DataTable(
+                id='table',
+                columns=cols,
+                data=json_chains,
+                filter_action="native",
+                sort_action="native",
+                sort_mode="multi",
+                fixed_columns={ 'headers': True, 'data': 1 },
+                style_table=TABLE_STYLE,
+                style_cell=TABLE_CELL_STYLE,
+                style_data_conditional=TABLE_CONDITIONALFORMAT
+            )
+
+@app.callback(
+    Output("cont_tbl_add", "children"),
+    Input("cont_tbl_add", "children"),
+    State('walletoverview', 'data'),
+    prevent_initial_call=False,
+)
+def setupaddtable(trigger,data):
+        
+    cols=colsetup(["name","addresse","chainid"])
+    
+    r=ws.getchains()
+
+    dropdowns={"chainid":{
+                'options': [
+                    {'label': i["label"], 'value': i["chain_id"]}
+                    for i in r
+                ]
+            },
+        }
+    data=None    
+    if data is None:
+        return DataTable(
+                id='table-editing-wallets',
+                columns=cols,
+                data=[],
+                dropdown=dropdowns,
+                css = [{
+                    "selector": ".Select-menu-outer",
+                    "rule": 'display : block!important'
+                }],
+                editable=True
+            )
+    else:
+        return DataTable(
+                id='table-editing-wallets',
+                columns=cols,
+                data=[],
+                dropdown=dropdowns,
+                css = [{
+                    "selector": ".Select-menu-outer",
+                    "rule": 'display : block!important'
+                }],
+                editable=True
+            )       

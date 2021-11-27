@@ -7,7 +7,7 @@ import dash_html_components as html
 
 #%%
 layout = html.Div([
-    html.H1("Upload a yaml file:"),
+    html.H1("Upload your wallet overview file:"),
     dcc.Upload(
         id='upload-image',
         children=html.Div([
@@ -28,5 +28,8 @@ layout = html.Div([
         multiple=True
     ),
     html.Div(id='output-image-upload'),
+    dcc.Interval(id="updater",
+                 interval=10*1000,
+                 n_intervals=0)
 ])
 
