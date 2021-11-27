@@ -67,13 +67,33 @@ class walletscanner:
                 decimal=i["contract_decimals"]
                 token=i["contract_ticker_symbol"]
                 quote=i["quote"]
-                
+                quote24h=i["quote_24h"]
                 self.total+=i["quote"]
                 
-                decimal_balance=i["balance"]                
-                balance=int(decimal_balance)/(10**decimal)
+                try:
+                    decimal_balance=i["balance"]                
+                    balance=int(decimal_balance)/(10**decimal)
+                except:
+                    balance=None
                 
-                walletoverview.append([attr["addr"],attr["network"],token,balance,quote])
+                try:
+                    decimal_balane24h=i["balance_24h"]
+                    balance24h=int(decimal_balane24h)/(10**decimal)
+                except:
+                    balance24h=None
+                
+                try:
+                    delta_balance=(balance-balance24h)/balance
+                except:
+                    delta_balance=None
+                    
+                try:
+                    delta_quote=(quote-quote24h)/quote
+                except:
+                    delta_quote=None
+                                        
+                    
+                walletoverview.append([attr["addr"],attr["network"],token,balance24h,balance,delta_balance,quote24h,quote,delta_quote])
                 
                 print("{}: {} ({} {})".format(token,balance,quote,self.currency))
             
@@ -81,7 +101,7 @@ class walletscanner:
         
         print("total: {} {}".format(self.total,self.currency))
         
-        return pd.DataFrame(walletoverview,columns=["wallet","network","token","balance","quote"])
+        return pd.DataFrame(walletoverview,columns=["wallet","network","token","balance 24h","balance","delta balance","quote 24h","quote","delta quote"])
         
 if __name__=="__main__":
     ws=walletscanner()
