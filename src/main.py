@@ -11,7 +11,6 @@ import yaml
 import os
 import requests
 import pandas as pd 
-import json
 
 class walletscanner:
     def __init__(self):
@@ -34,7 +33,7 @@ class walletscanner:
         self.wallets=None
     
     def setwallets(self,file):
-        self.wallets= json.loads(file)
+        self.wallets= file
         
         return self.wallets
         
@@ -64,16 +63,11 @@ class walletscanner:
         for i in self.wallets["wallets"]:
             
             attr=i
-            print("Processing wallet called: {}".format(i["name"]))
-            print("Scanning {} with chain id {}".format(attr["addresse"],attr["chainid"]))
-                        
+   
             requrl=self.balanceendpoint.format(attr["chainid"],attr["addresse"],self.currency,self.format) 
             
             r=requests.get(self.baseurl + requrl + self.key)
             
-            
-            print("\n")
-            print("Status")
             for i in r.json()["data"]["items"]:
                 decimal=i["contract_decimals"]
                 token=i["contract_ticker_symbol"]
@@ -106,12 +100,6 @@ class walletscanner:
                     
                 walletoverview.append([attr["addresse"],token,balance24h,balance,delta_balance,quote24h,quote,delta_quote])
                 
-                print("{}: {} ({} {})".format(token,balance,quote,self.currency))
-            
-            print("\n")
-        
-        print("total: {} {}".format(self.total,self.currency))
-        
         return pd.DataFrame(walletoverview,columns=["wallet","token","balance 24h","balance","delta balance","quote 24h","quote","delta quote"])
         
 if __name__=="__main__":

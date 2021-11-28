@@ -76,7 +76,13 @@ money = FormatTemplate.money(2)
 percentage = FormatTemplate.percentage(2)
 
 content = html.Div(id="page-content", style=CONTENT_STYLE)
-app.layout = html.Div([dcc.Location(id="url"), menu.sidebar, content,dcc.Store(id="walletoverview",storage_type="session")
+app.layout = html.Div([
+    dcc.Location(id="url"), 
+    menu.sidebar, 
+    content,
+    dcc.Store(id="walletoverview_upload",storage_type="session"),
+    dcc.Store(id="walletoverview_tbl",storage_type="session"),
+    dcc.Store(id="walletoverview_global",storage_type="session")
 ])
 
 
@@ -118,113 +124,143 @@ def colsetup(columns):
             
     return cols
 
-def parse_contents(contents, filename, date):
-    content_type, content_string = contents.split(',')
-
-    decoded = base64.b64decode(content_string)
+def parse_contents(contents):
     try:
-        if 'json' in filename:
-            ws.setwallets(decoded)
-            # Assume that the user uploaded a CSV file
-            overview=ws.scancomplete()
-            
-            overview=overview[overview["balance"]>0].copy()
+        ws.setwallets(contents)
+        # Assume that the user uploaded a CSV file
+        overview=ws.scancomplete()
+        
+        overview=overview[overview["balance"]>0].copy()
 
-            
-            cols=colsetup(overview.columns)
-            tbl_all=DataTable(
-                        id='table',
-                        columns=cols,
-                        data=overview.to_dict('records'),
-                        filter_action="native",
-                        sort_action="native",
-                        sort_mode="multi",
-                        fixed_columns={ 'headers': True, 'data': 1 },
-                        style_table=TABLE_STYLE,
-                        style_cell=TABLE_CELL_STYLE,
-                        style_data_conditional=TABLE_CONDITIONALFORMAT
-                    )
-            
-            df_grouped=overview.groupby(["token"]).sum().reset_index()
-            
-            
-            cols=colsetup(df_grouped.columns)
-            tbl_acc=DataTable(
-                        id='table',
-                        columns=cols,
-                        data=df_grouped.to_dict('records'),
-                        filter_action="native",
-                        sort_action="native",
-                        sort_mode="multi",
-                        fixed_columns={ 'headers': True, 'data': 1 },
-                        style_table=TABLE_STYLE,
-                        style_cell=TABLE_CELL_STYLE,
-                        style_data_conditional=TABLE_CONDITIONALFORMAT
-                    )
-            
-            header=html.H1("All held tokens:")
-            header2=html.H1("Balance of held tokens:")
-
-            return  html.Div(children=[header,tbl_all,header2,tbl_acc])
-                                
-            
+        
+        cols=colsetup(overview.columns)
+        tbl_all=DataTable(
+                    id='table',
+                    columns=cols,
+                    data=overview.to_dict('records'),
+                    filter_action="native",
+                    sort_action="native",
+                    sort_mode="multi",
+                    fixed_columns={ 'headers': True, 'data': 1 },
+                    style_table=TABLE_STYLE,
+                    style_cell=TABLE_CELL_STYLE,
+                    style_data_conditional=TABLE_CONDITIONALFORMAT
+                )
+        
+        df_grouped=overview.groupby(["token"]).sum().reset_index()
+        
+        
+        cols=colsetup(df_grouped.columns)
+        tbl_acc=DataTable(
+                    id='table',
+                    columns=cols,
+                    data=df_grouped.to_dict('records'),
+                    filter_action="native",
+                    sort_action="native",
+                    sort_mode="multi",
+                    fixed_columns={ 'headers': True, 'data': 1 },
+                    style_table=TABLE_STYLE,
+                    style_cell=TABLE_CELL_STYLE,
+                    style_data_conditional=TABLE_CONDITIONALFORMAT
+                )
+        
+        header=html.H1("All held tokens:")
+        header2=html.H1("Balance of held tokens:")
+        
+        return  html.Div(children=[header,tbl_all,header2,tbl_acc])
     except Exception as e:
         print(e)
         return html.Div([
-            'There was an error processing this file.'
+            'There was an error processing this file'
         ])
 
 @app.callback(Output('output-image-upload', 'children'),
-              Output('walletoverview','data'),
-              Input('upload-image', 'contents'),
-              Input("updater","n_intervals"),
-              State('upload-image', 'filename'),
-              State('upload-image', 'last_modified'),
-              State('walletoverview', 'data'),)
-def update_output(list_of_contents,intervals, list_of_names, list_of_dates,data):
+              Input('walletoverview_global', 'data'),
+              Input("updater","n_intervals"))
+def update_output(data,intervals):
     if data is not None:
-        if all(v is not None for v in data) and list_of_contents is None:
-            children = [
-                parse_contents(c, n, d) for c, n, d in
-                zip(data[0], data[1], data[2])]
-            return children,data         
-        
-    if list_of_contents is not None:
-        children = [
-            parse_contents(c, n, d) for c, n, d in
-            zip(list_of_contents, list_of_names, list_of_dates)]
-        return children,[list_of_contents, list_of_names, list_of_dates] 
-    
-    return html.Div(),html.Div()
-    
-@app.callback(
-    Output('table-editing-wallets', 'data'),
-    Input('editing-rows-button', 'n_clicks'),
-    State('table-editing-wallets', 'data'),
-    State('table-editing-wallets', 'columns'))
-def add_row(n_clicks, rows, columns):
-    if n_clicks > 0:
-        rows.append({c['id']: '' for c in columns})
-    return rows
+        return parse_contents(data[0]) 
+    return html.Div()
 
-@app.callback(
-    Output("download-table", "children"),
-    Input("download-button", "n_clicks"),
-    State('table-editing-wallets',"data"),
-    prevent_initial_call=True,
-)
-def func(n_clicks,data):
-    content={"wallets":data}
+
+@app.callback(Output('walletoverview_upload','data'),
+              Input('upload-image', 'contents'),
+              prevent_initial_call=True,
+              )
     
+def uploadconfig(list_of_contents):
+    if list_of_contents is None:
+        return None
+    if len(list_of_contents)==0:
+        return None
+    elif len(list_of_contents)==1:
+        content_type, content_string = list_of_contents[0].split(',')
+        return [json.loads(base64.b64decode(content_string))]
+    else:
+        return None  
+    
+
+@app.callback(Output('walletoverview_global','data'),
+              Input('walletoverview_upload', 'data'),
+              Input('walletoverview_tbl', 'data'),
+              Input('walletoverview_global', 'data'),
+              )
+    
+def globalconfig(upload_data,tbl_data,curr_config):
+    ctx = dash.callback_context
+
+    if not ctx.triggered:
+        triggerid = 'No clicks yet'
+    else:
+        triggerid = ctx.triggered[0]['prop_id'].split('.')[0]
+    
+    if triggerid=="walletoverview_upload":
+        if upload_data is not None:
+            return upload_data
+        else:
+            return curr_config
+    elif triggerid=="walletoverview_tbl":
+        if tbl_data is not None:
+            return tbl_data
+        else:
+            return curr_config
+    else:
+        return None
+
+@app.callback(Output('walletoverview_tbl','data'),
+              Output("download-table", "children"),
+              Input("download-button", "n_clicks"),
+              State('table-editing-wallets', 'data'),
+              prevent_initial_call=True,
+              )
+    
+def tblconfig(n_clicks,tbl_data):
+    
+    content={"wallets":tbl_data}
     data_string = json.dumps(content)
-    
-    return html.A(
+
+    downloadlink=html.A(
         "Download Data",
         id="download-link",
         download="download.json",
         href=f"data:text/json;charset=utf-8,{data_string}",
         target="_blank",
         )  
+
+    
+    return [content],downloadlink
+    
+    
+@app.callback(
+    Output('table-editing-wallets', 'data'),
+    Input('editing-rows-button', 'n_clicks'),
+    State('table-editing-wallets', 'data'),
+    State('table-editing-wallets', 'columns'),
+    prevent_initial_call=True,)
+def add_row(n_clicks, rows, columns):
+    if n_clicks > 0:
+        rows.append({c['id']: '' for c in columns})
+    return rows
 
 @app.callback(
     Output("cont_tbl_chains", "children"),
@@ -254,11 +290,10 @@ def chainreader(trigger):
 @app.callback(
     Output("cont_tbl_add", "children"),
     Input("cont_tbl_add", "children"),
-    State('walletoverview', 'data'),
+    State('walletoverview_global', 'data'),
     prevent_initial_call=False,
 )
 def setupaddtable(trigger,data):
-        
     cols=colsetup(["name","addresse","chainid"])
     
     r=ws.getchains()
@@ -270,7 +305,6 @@ def setupaddtable(trigger,data):
                 ]
             },
         }
-    data=None    
     if data is None:
         return DataTable(
                 id='table-editing-wallets',
@@ -281,17 +315,19 @@ def setupaddtable(trigger,data):
                     "selector": ".Select-menu-outer",
                     "rule": 'display : block!important'
                 }],
-                editable=True
+                editable=True,
+                row_deletable=True
             )
     else:
         return DataTable(
                 id='table-editing-wallets',
                 columns=cols,
-                data=[],
+                data=data[0]["wallets"],
                 dropdown=dropdowns,
                 css = [{
                     "selector": ".Select-menu-outer",
                     "rule": 'display : block!important'
                 }],
-                editable=True
+                editable=True,
+                row_deletable=True
             )       
