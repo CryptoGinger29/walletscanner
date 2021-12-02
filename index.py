@@ -3,6 +3,8 @@ import dash_bootstrap_components as dbc
 from dash import Input, Output, dcc, html, State
 from pages import menu,home,howto
 from dash_table import DataTable, FormatTemplate
+from flask import Flask
+
 
 from src.main import walletscanner
 import base64
@@ -10,7 +12,9 @@ import json
 
 ws=walletscanner()
 
-app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
+app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP],server=Flask(__name__))
+
+server=app.server
 
 # the style arguments for the sidebar. We use position:fixed and a fixed width
 SIDEBAR_STYLE = {
