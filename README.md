@@ -8,4 +8,4 @@ In the config/ their is a folder containing a config-template file that is used 
 
 ## Launch
 
-Use command gunicorn index:server -b :8000
+Use command gunicorn index:server -b :5000 -name walletscanner --workers 2  --daemon
