@@ -6,4 +6,6 @@ A small python package that utilizes the https://www.covalenthq.com/ endpoint to
 ## How to
 In the config/ their is a folder containing a config-template file that is used to fill in the information regarding the wallets that one wishes to scan
 
+## Launch
 
+Use command gunicorn index:server -b :5000 -name walletscanner --workers 2  --daemon
