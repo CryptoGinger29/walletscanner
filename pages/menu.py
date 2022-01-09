@@ -32,9 +32,7 @@ sidebar = html.Div(
     [
         html.H2("WS", className="display-4"),
         html.Hr(),
-        html.P(
-            "WalletScanner, the app to rule them all", className="lead"
-        ),
+        html.P("WalletScanner, the app to rule them all", className="lead"),
         dbc.Nav(
             [
                 dbc.NavLink("Home", href="/", active="exact"),

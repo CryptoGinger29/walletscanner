@@ -1,12 +1,12 @@
 name: walletconnectconfig
 key: ------- !! ---------
 wallets:
-  {"wallets":
-    [{"name":"",
-      "attributes":
-        {"addr":"",
-         "network":"",
-         "chainid": 1
-        }
-     },]
+  {
+    "wallets":
+      [
+        {
+          "name": "",
+          "attributes": { "addr": "", "network": "", "chainid": 1 },
+        },
+      ],
   }
